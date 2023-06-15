@@ -1,0 +1,825 @@
+const supertest = require("supertest");
+let accountData = require("../../mock/account.mock").differentCompanyAccount;
+let accountAccessDiffCompany =
+    require("../../mock/account.mock").sameCompanyAccountWithoutPropertAccess;
+
+const sandbox = require("sinon").createSandbox();
+
+describe("Property controller test cases", () => {
+    // beforeEach(() => {
+    //     // stub all the methods
+    //     const fake = () => {
+    //         return {
+    //             data: {
+    //                 status: 200, message: 'success', data: {
+    //                     propertyList: [
+    //                         {
+    //                             "id": 1,
+    //                             "name": "Test Property 1",
+    //                             "address": "Sydney NSW, Australia",
+    //                             "companyName": "Test1 company",
+    //                             "companyId": 1,
+    //                             "latitude": -33.8688197,
+    //                             "longitude": 151.2092955
+    //                         },
+    //                         {
+    //                             "id": 2,
+    //                             "name": "Test Property 2",
+    //                             "address": "74 Conselyea St, Brooklyn, NY 11211, USA",
+    //                             "companyName": "Test1 company",
+    //                             "companyId": 1,
+    //                             "latitude": 40.7146593,
+    //                             "longitude": -73.948472
+    //                         },
+    //                         {
+    //                             "id": 5,
+    //                             "name": "Test Property 5",
+    //                             "address": "303 Hide Away Dr, Port Aransas, TX 78373, USA",
+    //                             "companyName": "Test1 company",
+    //                             "companyId": 1,
+    //                             "latitude": 27.7733898,
+    //                             "longitude": -97.1034767
+    //                         }
+    //                     ]
+    //                 }
+    //             }
+    //         };
+
+    //     };
+    //     const fakeCompanyInfo = () => {
+    //         return {
+    //             data: {
+    //                 status: 200, message: 'success', data: {
+    //                     companyName: 'Test1 company',
+    //                     companyId: 1,
+    //                     accountType: 'str',
+    //                     companyType: 'owner'
+    //                 }
+    //             }
+    //         };
+    //     };
+    //     // stub all the methods
+    //     sandbox.stub(PropertyService, 'fetchListOfProperty').callsFake(fake);
+    //     sandbox.stub(MailService, 'sendEmailToAccount').callsFake(() => {
+    //     });
+    //     sandbox.stub(EventService, 'fetchSourceOfRequest').callsFake(() => {
+    //         return 'CHROME-EXTENSION';
+    //     });
+    //     sandbox.stub(PropertyService, 'fetchReferralDetails').callsFake(() => {
+    //         return { status: 200, data: { data: { name: 'test referral', message: 'testing referral detaisl' }}};
+    //     });
+    //     sandbox.stub(PropertyService, 'fetchCompanyInfo').callsFake(fakeCompanyInfo);
+    beforeEach(() => {
+        const fake = () => {
+            return {
+                data: {
+                    status: 200,
+                    message: "success",
+                    data: {
+                        propertyList: [
+                            {
+                                id: 1,
+                                name: "Test Property 1",
+                                address: "Sydney NSW, Australia",
+                                companyName: "Test1 company",
+                                companyId: 1,
+                                latitude: -33.8688197,
+                                longitude: 151.2092955,
+                            },
+                            {
+                                id: 2,
+                                name: "Test Property 2",
+                                address:
+                                    "74 Conselyea St, Brooklyn, NY 11211, USA",
+                                companyName: "Test1 company",
+                                companyId: 1,
+                                latitude: 40.7146593,
+                                longitude: -73.948472,
+                            },
+                            {
+                                id: 5,
+                                name: "Test Property 5",
+                                address:
+                                    "303 Hide Away Dr, Port Aransas, TX 78373, USA",
+                                companyName: "Test1 company",
+                                companyId: 1,
+                                latitude: 27.7733898,
+                                longitude: -97.1034767,
+                            },
+                        ],
+                    },
+                },
+            };
+        };
+        const fakeCompanyInfo = () => {
+            return {
+                data: {
+                    status: 200,
+                    message: "success",
+                    data: {
+                        companyName: "Test1 company",
+                        companyId: 1,
+                        accountType: "str",
+                        companyType: "owner",
+                    },
+                },
+            };
+        };
+
+        // stub all the methods
+        sandbox.stub(PropertyService, "fetchListOfProperty").callsFake(fake);
+        sandbox
+            .stub(PropertyService, "fetchCompanyInfo")
+            .callsFake(fakeCompanyInfo);
+        sandbox.stub(MailService, "sendEmailToAccount").callsFake(() => {});
+    });
+
+    afterEach(() => {
+        // completely restore all fakes created through the sandbox
+        sandbox.restore();
+    });
+
+    // Property add -->Done
+    describe("Checking add access property for CMS API", () => {
+       it("InValid Test : Validation error Should get bad request response", (done) => {
+            supertest(sails.hooks.http.app)
+                .post("/webhook/property/add")
+                .set("Authorization", sails.config.custom.b2bSecret)
+                .send({
+                    companyId: 1,
+                })
+                .expect(400, done);
+        });
+       it("InValid Test : Validation (when property Name is Number) error Should get bad request response", (done) => {
+            supertest(sails.hooks.http.app)
+                .post("/webhook/property/add")
+                .set("Authorization", sails.config.custom.b2bSecret)
+                .send({
+                    companyId: 1,
+                    propertyId: 2,
+                    propertyName: 3,
+                    companyName: 5,
+                })
+                .expect(400, done);
+        });
+
+       it("InValid Test : When some internal error occurs, Should get internal server error response", (done) => {
+            sandbox.stub(LogService, "error").callsFake(() => {});
+            sandbox.stub(sails.log, "error").callsFake(() => {});
+            sandbox
+                .stub(sails.log, "info")
+                .throws(new Error("Catch block test"));
+            supertest(sails.hooks.http.app)
+                .post("/webhook/property/add")
+                .set("Authorization", sails.config.custom.b2bSecret)
+                .expect(500, done);
+        });
+
+       it("Valid Test Account Add Via Owner : Should get success response", async () => {
+            await supertest(sails.hooks.http.app)
+                .post("/account/add")
+                .set("Authorization", sails.config.custom.ownerTestToken)
+                .send({
+                    firstName: accountData.firstName,
+                    lastName: accountData.lastName,
+                    email: accountData.email,
+                    contactNumber: accountData.contactNumber,
+                    image: accountData.image,
+                    companyId: accountData.companyId,
+                    propertyId: accountData.propertyId,
+                    roleType: accountData.roleType,
+                    propertyAccessList: accountData.propertyAccessList,
+                })
+                .expect(200);
+        });
+
+       it("Valid Test Account Add Via Member : Should get success response", async () => {
+            await supertest(sails.hooks.http.app)
+                .post("/account/add")
+                .set("Authorization", sails.config.custom.ownerTestToken)
+                .send({
+                    firstName: accountData.firstName,
+                    lastName: accountData.lastName,
+                    email: accountData.email,
+                    contactNumber: accountData.contactNumber,
+                    image: accountData.image,
+                    companyId: accountData.companyId,
+                    propertyId: accountData.propertyId,
+                    roleType: "member",
+                    propertyAccessList: accountData.propertyAccessList,
+                })
+                .expect(200);
+        });
+
+       it("Valid Test Get Account details On Owner Level  : Should get Success response", async () => {
+            await supertest(sails.hooks.http.app)
+                .get("/account/detail")
+                .set("utcoffset", -330)
+                .set("Authorization", sails.config.custom.ownerTestToken)
+                .query({
+                    id: 2,
+                    companyId: 1,
+                    propertyId: 0,
+                })
+                .expect(200);
+
+
+        });
+
+
+       it(" InValid Test Get Add Property On b2b Level : Should get error response", async () => {
+            await supertest(sails.hooks.http.app)
+                .post('/webhook/property/add')
+                .set('Authorization', sails.config.custom.b2bSecret)
+                .send({
+                    propertyId: 3,
+                    companyId: 1
+                })
+                .expect(400);
+            });
+
+
+        // it('InValid Test Get Account details On Admin Level  : Should get error response', async () => {
+
+        //    await supertest(sails.hooks.http.app)
+        // .get('/account/detail')
+        // .set('utcoffset', -330)
+        // .set('Authorization', sails.config.custom.propertyTestToken)
+        // .query({
+        //     id: 2,
+        //     companyId: 1,
+        //     propertyId: 0
+        // })
+        // .expect(400);
+
+        //     });
+    });
+
+    // await supertest(sails.hooks.http.app)
+    //     .get('/account/detail')
+    //     .set('utcoffset', -330)
+    //     .set('Authorization', sails.config.custom.propertyTestToken)
+    //     .query({
+    //         id: 2,
+    //         companyId: 1,
+    //         propertyId: 0
+    //     })
+    //     .expect(403);
+
+    // await supertest(sails.hooks.http.app)
+    //     .post('/webhook/property/add')
+    //     .set('Authorization', sails.config.custom.b2bSecret)
+    //     .send({
+    //         propertyId: 3,
+    //         companyId: 1
+    //     })
+    //     .expect(200);
+
+    // await supertest(sails.hooks.http.app)
+    //     .post('/webhook/property/add')
+    //     .set('Authorization', sails.config.custom.b2bSecret)
+    //     .send({
+    //         propertyId: 4,
+    //         companyId: 3
+    //     })
+    //     .expect(200);
+
+
+
+
+
+    describe("Checking edit access property for CMS API", () => {
+        it("InValid Test : Validation error Should get bad request response", (done) => {
+            supertest(sails.hooks.http.app)
+                .put("/webhook/property/update")
+                .set("Authorization", sails.config.custom.b2bSecret)
+                .send({
+                    companyId: 1,
+                })
+                .expect(400, done);
+        });
+
+        it("InValid Test : When some internal error occurs, Should get internal server error response", (done) => {
+            sandbox.stub(LogService, "error").callsFake(() => {});
+            sandbox.stub(sails.log, "error").callsFake(() => {});
+            sandbox
+                .stub(sails.log, "info")
+                .throws(new Error("Catch block test"));
+            supertest(sails.hooks.http.app)
+                .put("/webhook/property/update")
+                .set("Authorization", sails.config.custom.b2bSecret)
+                .expect(500, done);
+        });
+
+        it("Valid Test : Should get success response", async () => {
+            await supertest(sails.hooks.http.app)
+                .put("/webhook/property/update")
+                .set("Authorization", sails.config.custom.b2bSecret)
+                .send({
+                    propertyId: 3,
+                    oldCompanyId: 1,
+                    companyId: 1,
+                    companyName: "company",
+                })
+                .expect(200);
+
+            await supertest(sails.hooks.http.app)
+                .put("/webhook/property/update")
+                .set("Authorization", sails.config.custom.b2bSecret)
+                .send({
+                    propertyId: 4,
+                    companyId: 3,
+                    oldCompanyId: 3,
+                    companyName: "company",
+                })
+                .expect(200);
+
+            await supertest(sails.hooks.http.app)
+                .put("/webhook/property/update")
+                .set("Authorization", sails.config.custom.b2bSecret)
+                .send({
+                    propertyId: 4,
+                    companyId: 3,
+                    oldCompanyId: 5,
+                    companyName: "company",
+                })
+                .expect(200);
+        });
+    });
+
+
+    // List Property
+    describe("Checking List property for CMS API", () => {
+        it.only("InValid Test : Unauthorized for b2b Should get error response", (done) => {
+            supertest(sails.hooks.http.app)
+                .post("/property/list")
+                .set("Authorization", sails.config.custom.b2bSecret)
+                .send({
+                    type: 1893,
+                })
+                .expect(401, done);
+        });
+        it.only("InValid Test : Unauthorized for b2b Should get error response", (done) => {
+            supertest(sails.hooks.http.app)
+                .post("/property/list")
+                .set("Authorization", sails.config.custom.b2bSecret)
+                .send({
+                    type: 123,
+                })
+                .expect(401, done);
+        });
+
+        // Wrong Header TODO
+        // it.only("InValid Test : Unauthorized for b2b Should get error response", (done) => {
+        //     supertest(sails.hooks.http.app)
+        //         .post("/property/list")
+        //         .set("Authorization", sails.config.custom.propertyTestToken)
+        //         .send({
+        //             type: 123,
+        //         })
+        //         .expect(401, done);
+        // });
+
+
+
+        it.only("Vailad Test : For Owner access list get success response", (done) => {
+            supertest(sails.hooks.http.app)
+                .post("/property/list")
+                .set("Authorization", sails.config.custom.ownerTestToken)
+                .send({
+                    type: 1893,
+                })
+                .expect(200, done);
+        });
+
+        it.only("InValid Test : When some internal error occurs, Should get internal server error response", (done) => {
+            sandbox.stub(LogService, "error").callsFake(() => {});
+            sandbox.stub(sails.log, "error").callsFake(() => {});
+            sandbox
+                .stub(sails.log, "info")
+                .throws(new Error("Catch block test"));
+            supertest(sails.hooks.http.app)
+                .post("/property/list")
+                .set("Authorization", sails.config.custom.ownerTestToken)
+                .expect(500, done);
+        });
+
+
+        it.only("Valid Test : For prop different property types Should get success response", async () => {
+        
+            await supertest(sails.hooks.http.app)
+                .post("/property/list")
+                .set("Authorization", sails.config.custom.ownerTestToken)
+                .send({
+                    type: "shopping",
+                })
+                .expect(200);
+                await supertest(sails.hooks.http.app)
+                .post("/property/list")
+                .set("Authorization", sails.config.custom.ownerTestToken)
+                .send({
+                    type: "data",
+                })
+                .expect(200);
+
+            await supertest(sails.hooks.http.app)
+                .post("/property/list")
+                .set("Authorization", sails.config.custom.ownerTestToken)
+                .send({
+                    type: "admin",
+                })
+                .expect(200);
+
+            await supertest(sails.hooks.http.app)
+                .post("/property/list")
+                .set("Authorization", sails.config.custom.ownerTestToken)
+                .send({
+                    type: "tenant",
+                })
+                .expect(200);
+
+            await supertest(sails.hooks.http.app)
+                .post("/property/list")
+                .set("Authorization", sails.config.custom.ownerTestToken)
+                .send({})
+                .expect(200);
+
+            })
+
+    });
+
+    
+
+
+    describe("Checking remove access property for CMS API", () => {
+        it("InValid Test : Validation error Should get bad request response", (done) => {
+            supertest(sails.hooks.http.app)
+                .put("/webhook/property/remove")
+                .set("Authorization", sails.config.custom.b2bSecret)
+                .send({
+                    companyId: 1,
+                })
+                .expect(400, done);
+        });
+
+        it("InValid Test : When some internal error occurs, Should get internal server error response", (done) => {
+            sandbox.stub(LogService, "error").callsFake(() => {});
+            sandbox.stub(sails.log, "error").callsFake(() => {});
+            sandbox
+                .stub(sails.log, "info")
+                .throws(new Error("Catch block test"));
+            supertest(sails.hooks.http.app)
+                .put("/webhook/property/remove")
+                .set("Authorization", sails.config.custom.b2bSecret)
+                .expect(500, done);
+        });
+
+        it("Valid Test : Should get success response", async () => {
+            await supertest(sails.hooks.http.app)
+                .put("/webhook/property/remove")
+                .set("Authorization", sails.config.custom.b2bSecret)
+                .send({
+                    propertyId: 3,
+                    companyId: 1,
+                })
+                .expect(200);
+        });
+    });
+
+    describe("Checking remove access for company for CMS API", () => {
+        it("InValid Test : Validation error Should get bad request response", (done) => {
+            supertest(sails.hooks.http.app)
+                .put("/webhook/company/remove")
+                .set("Authorization", sails.config.custom.b2bSecret)
+                .send({})
+                .expect(400, done);
+        });
+
+        it("InValid Test : When some internal error occurs, Should get internal server error response", (done) => {
+            sandbox.stub(LogService, "error").callsFake(() => {});
+            sandbox.stub(sails.log, "error").callsFake(() => {});
+            sandbox
+                .stub(sails.log, "info")
+                .throws(new Error("Catch block test"));
+            supertest(sails.hooks.http.app)
+                .put("/webhook/company/remove")
+                .set("Authorization", sails.config.custom.b2bSecret)
+                .expect(500, done);
+        });
+
+        it("Valid Test : Should get success response", async () => {
+            await supertest(sails.hooks.http.app)
+                .put("/webhook/company/remove")
+                .set("Authorization", sails.config.custom.b2bSecret)
+                .send({
+                    companyId: 3,
+                })
+                .expect(200);
+        });
+    });
+
+    describe("Checking remove access for company for CMS API", () => {
+        it("InValid Test : Validation error Should get bad request response", (done) => {
+            supertest(sails.hooks.http.app)
+                .post("/property/list")
+                .set("Authorization", sails.config.custom.propertyTestToken)
+                .send({
+                    type: 123,
+                })
+                .expect(400, done);
+        });
+
+        it("InValid Test : When some internal error occurs, Should get internal server error response", (done) => {
+            sandbox.stub(LogService, "error").callsFake(() => {});
+            sandbox.stub(sails.log, "error").callsFake(() => {});
+            sandbox
+                .stub(sails.log, "info")
+                .throws(new Error("Catch block test"));
+            supertest(sails.hooks.http.app)
+                .post("/property/list")
+                .set("Authorization", sails.config.custom.propertyTestToken)
+                .expect(500, done);
+        });
+
+        it("Valid Test : Should get success response", async () => {
+            const fake = () => {
+                return {
+                    data: {
+                        status: 200,
+                        message: "success",
+                        data: {
+                            propertyList: [],
+                            companyList: [{ name: "company name", id: "1232" }],
+                        },
+                    },
+                };
+            };
+            sandbox.restore();
+            // stub all the methods
+            sandbox
+                .stub(PropertyService, "fetchListOfProperty")
+                .callsFake(fake);
+            await supertest(sails.hooks.http.app)
+                .post("/property/list")
+                .set("Authorization", sails.config.custom.propertyTestToken)
+                .send({
+                    type: "shopping",
+                })
+                .expect(200);
+
+            await supertest(sails.hooks.http.app)
+                .post("/property/list")
+                .set("Authorization", sails.config.custom.propertyTestToken)
+                .send({
+                    type: "data",
+                })
+                .expect(200);
+
+            await supertest(sails.hooks.http.app)
+                .post("/property/list")
+                .set("Authorization", sails.config.custom.propertyTestToken)
+                .send({
+                    type: "admin",
+                })
+                .expect(200);
+
+            await supertest(sails.hooks.http.app)
+                .post("/property/list")
+                .set("Authorization", sails.config.custom.propertyTestToken)
+                .send({
+                    type: "tenant",
+                })
+                .expect(200);
+
+            await supertest(sails.hooks.http.app)
+                .post("/property/list")
+                .set("Authorization", sails.config.custom.companyTestToken)
+                .send({})
+                .expect(200);
+        });
+    });
+
+    describe("Checking update access property for B2B API", () => {
+        it("InValid Test : Validation error Should get bad request response", (done) => {
+            supertest(sails.hooks.http.app)
+                .put("/property/access/update")
+                .set("Authorization", sails.config.custom.propertyTestToken)
+                .send({
+                    accountId: 2,
+                    propertyId: 1,
+                    companyId: 1,
+                    propertyShoppingAccess: 1,
+                    propertyAdminAccess: 1,
+                })
+                .expect(400, done);
+        });
+
+        it("InValid Test : When some internal error occurs, Should get internal server error response", (done) => {
+            sandbox.stub(LogService, "error").callsFake(() => {});
+            sandbox.stub(sails.log, "error").callsFake(() => {});
+            sandbox
+                .stub(sails.log, "info")
+                .throws(new Error("Catch block test"));
+            supertest(sails.hooks.http.app)
+                .put("/property/access/update")
+                .set("Authorization", sails.config.custom.propertyTestToken)
+                .send({
+                    accountId: 2,
+                    propertyId: 1,
+                    companyId: 1,
+                })
+                .expect(500, done);
+        });
+
+        it("Valid Test : Should get success response", async () => {
+            await supertest(sails.hooks.http.app)
+                .put("/property/access/update")
+                .set("Authorization", sails.config.custom.propertyTestToken)
+                .send({
+                    accountId: 2,
+                    propertyId: 1,
+                    companyId: 1,
+                    propertyDataAccess: 0,
+                    propertyTenantAccess: 0,
+                    propertyShoppingAccess: 1,
+                    propertyAdminAccess: 1,
+                })
+                .expect(200);
+        });
+    });
+
+    describe("Checking access property list for B2B API", () => {
+        it("InValid Test : Validation error Should get bad request response", async () => {
+            await supertest(sails.hooks.http.app)
+                .post("/property/access/list")
+                .set("Authorization", sails.config.custom.propertyTestToken)
+                .send({
+                    order: [{ columnName: "propertyId", direction: false }],
+                    companyId: 1,
+                    propertyId: 1,
+                })
+                .expect(400);
+
+            await supertest(sails.hooks.http.app)
+                .post("/property/access/list")
+                .set("Authorization", sails.config.custom.propertyTestToken)
+                .set("utcoffset", -330)
+                .send({
+                    order: [{ columnName: "propertyId", direction: false }],
+                    companyId: 1,
+                    propertyId: 1,
+                })
+                .expect(400);
+        });
+
+        it("InValid Test : When some internal error occurs, Should get internal server error response", (done) => {
+            sandbox.stub(LogService, "error").callsFake(() => {});
+            sandbox.stub(sails.log, "error").callsFake(() => {});
+            sandbox
+                .stub(sails.log, "info")
+                .throws(new Error("Catch block test"));
+            supertest(sails.hooks.http.app)
+                .post("/property/access/list")
+                .set("Authorization", sails.config.custom.propertyTestToken)
+                .set("utcoffset", -330)
+                .send({
+                    order: [],
+                    accountId: 2,
+                    companyId: 1,
+                    propertyId: 1,
+                })
+                .expect(500, done);
+        });
+
+        it("Valid Test : Should get success response", async () => {
+            await supertest(sails.hooks.http.app)
+                .post("/property/access/list")
+                .set("Authorization", sails.config.custom.propertyTestToken)
+                .set("utcoffset", -330)
+                .send({
+                    order: [{ columnName: "propertyId", direction: true }],
+                    accountId: 2,
+                    companyId: 1,
+                    propertyId: 1,
+                })
+                .expect(200);
+
+            await supertest(sails.hooks.http.app)
+                .post("/property/access/list")
+                .set("Authorization", sails.config.custom.propertyTestToken)
+                .set("utcoffset", -330)
+                .send({
+                    order: [{ columnName: "propertyId", direction: false }],
+                    accountId: 1,
+                    companyId: 1,
+                    propertyId: 1,
+                })
+                .expect(200);
+
+            const fake = () => {
+                return {
+                    data: {
+                        status: 200,
+                        message: "success",
+                        data: {
+                            propertyList: [],
+                        },
+                    },
+                };
+            };
+            sandbox.restore();
+            // stub all the methods
+            sandbox
+                .stub(PropertyService, "fetchListOfProperty")
+                .callsFake(fake);
+
+            await supertest(sails.hooks.http.app)
+                .post("/property/access/list")
+                .set("Authorization", sails.config.custom.propertyTestToken)
+                .set("utcoffset", -330)
+                .send({
+                    order: [],
+                    accountId: 2,
+                    companyId: 1,
+                    propertyId: 1,
+                })
+                .expect(200);
+        });
+    });
+
+    describe("Checking Fetch Property Referral Details API", () => {
+        // it('InValid Test : Validation error Should get bad request response', (done) => {
+
+        //     supertest(sails.hooks.http.app)
+        //         .get('/property/referral/details')
+        //         .set('Authorization', sails.config.custom.propertyTestToken)
+        //         .query({
+        //             propertyId: [],
+        //         })
+        //         .expect(400, done);
+        // });
+
+        it("InValid Test : When some internal error occurs, Should get internal server error response", (done) => {
+            sandbox.stub(LogService, "error").callsFake(() => {});
+            sandbox.stub(sails.log, "error").callsFake(() => {});
+            sandbox
+                .stub(sails.log, "info")
+                .throws(new Error("Catch block test"));
+            supertest(sails.hooks.http.app)
+                .get("/property/referral/details")
+                .set("Authorization", sails.config.custom.propertyTestToken)
+                .query({
+                    propertyId: 1,
+                })
+                .expect(500, done);
+        });
+
+        it("Valid Test : Should get success response", async () => {
+            await supertest(sails.hooks.http.app)
+                .get("/property/referral/details")
+                .set("Authorization", sails.config.custom.propertyTestToken)
+                .query({
+                    propertyId: 1,
+                })
+                .expect(200);
+        });
+    });
+
+    describe("Checking Send Referral Email API", () => {
+        it("InValid Test : Validation error Should get bad request response", (done) => {
+            supertest(sails.hooks.http.app)
+                .post("/property/referral/send")
+                .set("Authorization", sails.config.custom.propertyTestToken)
+                .send({
+                    email: "test@minoan.com",
+                })
+                .expect(400, done);
+        });
+
+        it("InValid Test : When some internal error occurs, Should get internal server error response", (done) => {
+            sandbox.stub(LogService, "error").callsFake(() => {});
+            sandbox.stub(sails.log, "error").callsFake(() => {});
+            sandbox
+                .stub(sails.log, "info")
+                .throws(new Error("Catch block test"));
+            supertest(sails.hooks.http.app)
+                .post("/property/referral/send")
+                .set("Authorization", sails.config.custom.propertyTestToken)
+                .send({
+                    propertyId: 1,
+                })
+                .expect(500, done);
+        });
+
+        // it('Valid Test : Should get success response', async () => {
+        //     await supertest(sails.hooks.http.app)
+        //         .post('/property/referral/send')
+        //         .set('Authorization', sails.config.custom.propertyTestToken)
+        //         .send({
+        //             propertyId: 1,
+        //             email: 'test@minoan.com',
+        //         })
+        //         .expect(400);
+        // });
+    });
+});
